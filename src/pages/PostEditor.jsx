@@ -32,6 +32,29 @@ export default function PostEditorPage() {
   const contentRef = useRef();
   const inlineFileRef = useRef();
   const contentLoaded = useRef(false);
+  const savedRange = useRef(null); // saved caret position when editor loses focus
+
+  // Call this on the editor's onBlur to capture the caret before a button/input steals focus
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      savedRange.current = sel.getRangeAt(0).cloneRange();
+    }
+  };
+
+  // Restore the saved caret, then insert HTML at that position
+  const insertAtCursor = (html) => {
+    const el = contentRef.current;
+    if (!el) return;
+    el.focus();
+    const sel = window.getSelection();
+    if (savedRange.current && sel) {
+      sel.removeAllRanges();
+      sel.addRange(savedRange.current);
+    }
+    document.execCommand('insertHTML', false, html);
+    savedRange.current = null;
+  };
 
   const [showYtInput, setShowYtInput]         = useState(false);
   const [ytUrlValue, setYtUrlValue]           = useState('');
@@ -39,20 +62,20 @@ export default function PostEditorPage() {
   const [imgUrlValue, setImgUrlValue]         = useState('');
   const [inlineUploading, setInlineUploading] = useState(false);
 
-  const handleInsertImageUrl = () => {
-    const url = imgUrlValue.trim();
-    if (!url) { setError('Please enter an image URL.'); return; }
-    insertAtCursor(`<img src="${url}" alt="image">`);
-    setImgUrlValue('');
-    setShowImgInput(false);
-  };
-
   // Read HTML from the contenteditable div
   const getContent = () => {
     const el = contentRef.current;
     if (!el) return form.content;
     const html = el.innerHTML;
     return html === '<br>' || html === '' ? '' : html;
+  };
+
+  const handleInsertImageUrl = () => {
+    const url = imgUrlValue.trim();
+    if (!url) { setError('Please enter an image URL.'); return; }
+    insertAtCursor(`<img src="${url}" alt="image">`);
+    setImgUrlValue('');
+    setShowImgInput(false);
   };
 
   // Apply a document.execCommand format — uses onMouseDown so editor keeps focus/selection
@@ -94,6 +117,15 @@ export default function PostEditorPage() {
   };
 
   const handleInsertYoutube = () => {
+    const embedSrc = toEmbedUrl(ytUrlValue.trim());
+    if (!embedSrc) { setError('Invalid YouTube URL or embed code.'); return; }
+    insertAtCursor(
+      `<iframe src="${embedSrc}" height="315" title="YouTube video" frameborder="0" ` +
+      `allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+    );
+    setYtUrlValue('');
+    setShowYtInput(false);
+  };
     const embedSrc = toEmbedUrl(ytUrlValue.trim());
     if (!embedSrc) { setError('Invalid YouTube URL or embed code.'); return; }
     insertAtCursor(
@@ -341,6 +373,7 @@ export default function PostEditorPage() {
               suppressContentEditableWarning
               className={styles.contentEditable}
               data-placeholder="Write your article here…"
+              onBlur={saveSelection}
             />
           </div>
         </div>
