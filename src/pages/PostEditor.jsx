@@ -33,9 +33,19 @@ export default function PostEditorPage() {
   const inlineFileRef = useRef();
   const contentLoaded = useRef(false);
 
-  const [showYtInput, setShowYtInput]     = useState(false);
-  const [ytUrlValue, setYtUrlValue]       = useState('');
+  const [showYtInput, setShowYtInput]         = useState(false);
+  const [ytUrlValue, setYtUrlValue]           = useState('');
+  const [showImgInput, setShowImgInput]       = useState(false);
+  const [imgUrlValue, setImgUrlValue]         = useState('');
   const [inlineUploading, setInlineUploading] = useState(false);
+
+  const handleInsertImageUrl = () => {
+    const url = imgUrlValue.trim();
+    if (!url) { setError('Please enter an image URL.'); return; }
+    insertAtCursor(`<img src="${url}" alt="image">`);
+    setImgUrlValue('');
+    setShowImgInput(false);
+  };
 
   // Read HTML from the contenteditable div
   const getContent = () => {
@@ -270,17 +280,16 @@ export default function PostEditorPage() {
             <div className={styles.mediaToolbar}>
               <button
                 type="button"
-                className={styles.mediaBtn}
-                disabled={inlineUploading}
-                onClick={() => inlineFileRef.current.click()}
-                title="Insert image at cursor position"
+                className={`${styles.mediaBtn} ${showImgInput ? styles.mediaBtnActive : ''}`}
+                onClick={() => { setShowImgInput(v => !v); setImgUrlValue(''); setShowYtInput(false); setError(''); }}
+                title="Insert image from URL"
               >
-                {inlineUploading ? 'Uploading…' : '📷 Insert Image'}
+                🖼 Image URL
               </button>
               <button
                 type="button"
                 className={`${styles.mediaBtn} ${showYtInput ? styles.mediaBtnActive : ''}`}
-                onClick={() => { setShowYtInput(v => !v); setYtUrlValue(''); setError(''); }}
+                onClick={() => { setShowYtInput(v => !v); setYtUrlValue(''); setShowImgInput(false); setError(''); }}
                 title="Insert YouTube video at cursor position"
               >
                 ▶ Insert Video
@@ -293,6 +302,22 @@ export default function PostEditorPage() {
                 onChange={handleInlineImage}
               />
             </div>
+
+            {showImgInput && (
+              <div className={styles.ytRow}>
+                <input
+                  className={styles.input}
+                  value={imgUrlValue}
+                  onChange={e => setImgUrlValue(e.target.value)}
+                  placeholder="https://example.com/image.jpg"
+                  onKeyDown={e => e.key === 'Enter' && handleInsertImageUrl()}
+                  autoFocus
+                />
+                <button type="button" className={styles.ytInsertBtn} onClick={handleInsertImageUrl}>
+                  Insert
+                </button>
+              </div>
+            )}
 
             {showYtInput && (
               <div className={styles.ytRow}>
