@@ -150,6 +150,45 @@ export async function updateUserRole(uid, newRole, idToken) {
 }
 
 // ─── Image upload ─────────────────────────────────────────────────────────────
+// ─── Image helpers ───────────────────────────────────────────────────────────
+// Compress any image to JPEG ≤ 1600px wide/tall at 82% quality via Canvas.
+// Keeps the base64 payload well under Netlify's 6 MB function body limit.
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(objectUrl);
+      let { width, height } = img;
+      const MAX = 1600;
+      if (width > MAX || height > MAX) {
+        const r = Math.min(MAX / width, MAX / height);
+        width = Math.round(width * r);
+        height = Math.round(height * r);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        blob => blob ? resolve(blob) : reject(new Error('Image compression failed')),
+        'image/jpeg', 0.82,
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error('Failed to load image')); };
+    img.src = objectUrl;
+  });
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
 export async function uploadImage(file, idToken, folder = 'posts') {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
   const mimeMap = { png: 'image/png', gif: 'image/gif', webp: 'image/webp', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
@@ -157,19 +196,17 @@ export async function uploadImage(file, idToken, folder = 'posts') {
   const filename = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
   const encoded = encodeURIComponent(filename);
 
-  // On Netlify (production), proxy through a serverless function to avoid CORS restrictions.
-  // File is sent as base64 JSON to avoid binary body encoding issues in Netlify Functions.
+  // On Netlify (production), compress the image first then proxy through a serverless
+  // function to avoid CORS restrictions. Compression keeps payload under Netlify's 6 MB limit.
   if (!import.meta.env.DEV) {
-    const base64 = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
+    const compressed = await compressImage(file);
+    const base64 = await blobToBase64(compressed);
+    // Always use .jpg filename since we compress to JPEG
+    const jpgFilename = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.jpg`;
     const res = await fetch('/.netlify/functions/upload-image', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ base64, mimeType: mime, filename, token: idToken }),
+      body: JSON.stringify({ base64, mimeType: 'image/jpeg', filename: jpgFilename, token: idToken }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? 'Upload failed');
