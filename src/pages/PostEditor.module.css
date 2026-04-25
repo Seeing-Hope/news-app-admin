@@ -252,6 +252,95 @@
   font-size: 15px;
 }
 
+/* ── WYSIWYG editor toolbar ──────────────────────────────────────────────── */
+.editorToolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  background: #F4EFEB;
+  border: 1px solid #D8CEC6;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  padding: 6px 10px;
+}
+
+.toolbarGroup {
+  display: flex;
+  gap: 1px;
+}
+
+.toolbarSep {
+  width: 1px;
+  height: 20px;
+  background: #D8CEC6;
+  margin: 0 5px;
+  align-self: center;
+  flex-shrink: 0;
+}
+
+.fmtBtn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #5F6757;
+  padding: 3px 7px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.5;
+  min-width: 28px;
+  text-align: center;
+  transition: all 0.1s;
+  user-select: none;
+}
+.fmtBtn:hover { background: #fff; border-color: #D8CEC6; color: #3A3A3A; }
+.fmtBtn:active { background: #e0d9d0; }
+
+.contentEditable {
+  border: 1px solid #D8CEC6;
+  border-radius: 0 0 8px 8px;
+  padding: 16px 18px;
+  min-height: 380px;
+  font-family: Georgia, serif;
+  font-size: 15px;
+  line-height: 1.75;
+  color: #3A3A3A;
+  background: #FFFCF9;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+}
+.contentEditable:focus { border-color: #7D8C73; }
+.contentEditable:empty::before {
+  content: attr(data-placeholder);
+  color: #B8AFA8;
+  pointer-events: none;
+}
+.contentEditable h2 { font-size: 22px; font-weight: 700; margin: 18px 0 8px; }
+.contentEditable h3 { font-size: 17px; font-weight: 700; margin: 14px 0 6px; }
+.contentEditable p  { margin-bottom: 12px; }
+.contentEditable blockquote {
+  border-left: 3px solid #C2860A;
+  padding-left: 14px;
+  margin: 14px 0;
+  color: #5F6757;
+  font-style: italic;
+}
+.contentEditable ul,
+.contentEditable ol  { padding-left: 24px; margin-bottom: 12px; }
+.contentEditable li  { margin-bottom: 4px; }
+.contentEditable img { max-width: 100%; border-radius: 8px; margin: 12px 0; }
+.contentEditable iframe {
+  width: 100%;
+  border-radius: 8px;
+  border: none;
+  margin: 12px 0;
+  min-height: 200px;
+}
+.contentEditable a { color: #C2860A; }
+
 /* ── Inline media toolbar ─────────────────────────────────────────────────── */
 .mediaToolbar {
   display: flex;

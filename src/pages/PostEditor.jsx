@@ -31,10 +31,25 @@ export default function PostEditorPage() {
   const fileRef = useRef();
   const contentRef = useRef();
   const inlineFileRef = useRef();
+  const contentLoaded = useRef(false);
 
   const [showYtInput, setShowYtInput]     = useState(false);
   const [ytUrlValue, setYtUrlValue]       = useState('');
   const [inlineUploading, setInlineUploading] = useState(false);
+
+  // Read HTML from the contenteditable div
+  const getContent = () => {
+    const el = contentRef.current;
+    if (!el) return form.content;
+    const html = el.innerHTML;
+    return html === '<br>' || html === '' ? '' : html;
+  };
+
+  // Apply a document.execCommand format — uses onMouseDown so editor keeps focus/selection
+  const execFormat = (command, value = null) => {
+    contentRef.current?.focus();
+    document.execCommand(command, false, value);
+  };
 
   const toEmbedUrl = (url) => {
     const trimmed = url.trim();
@@ -49,15 +64,8 @@ export default function PostEditorPage() {
   const insertAtCursor = (html) => {
     const el = contentRef.current;
     if (!el) return;
-    const start = el.selectionStart;
-    const end   = el.selectionEnd;
-    const newContent = form.content.slice(0, start) + '\n' + html + '\n' + form.content.slice(end);
-    set('content', newContent);
-    requestAnimationFrame(() => {
-      const pos = start + html.length + 2;
-      el.focus();
-      el.setSelectionRange(pos, pos);
-    });
+    el.focus();
+    document.execCommand('insertHTML', false, html);
   };
 
   const handleInlineImage = async (e) => {
@@ -85,6 +93,14 @@ export default function PostEditorPage() {
     setYtUrlValue('');
     setShowYtInput(false);
   };
+
+  // Populate the contenteditable div once the post loads (edit mode).
+  // Runs when loading flips to false — by then contentRef is mounted and form.content is set.
+  useEffect(() => {
+    if (!isEdit || loading || !contentRef.current || contentLoaded.current) return;
+    contentRef.current.innerHTML = form.content || '';
+    contentLoaded.current = true;
+  }, [loading, form.content, isEdit]);
 
   useEffect(() => {
     if (!isEdit) return;
@@ -128,9 +144,10 @@ export default function PostEditorPage() {
   };
 
   const handleSave = async (publishDirectly = false) => {
+    const content = getContent();
     if (!form.title.trim()) { setError('Title is required.'); return; }
     if (!form.summary.trim()) { setError('Summary is required.'); return; }
-    if (!form.content.trim()) { setError('Content is required.'); return; }
+    if (!content.trim()) { setError('Content is required.'); return; }
     if (!form.authorName.trim()) { setError('Author name is required.'); return; }
     setError('');
     setSaving(true);
@@ -147,6 +164,7 @@ export default function PostEditorPage() {
 
       const payload = {
         ...form,
+        content,
         imageUrl,
         status: publishDirectly ? 'published' : form.status,
       };
@@ -200,9 +218,53 @@ export default function PostEditorPage() {
               placeholder="Short summary shown in article cards"
             />
 
-            <label className={styles.label}>Content <span className={styles.req}>*</span>
-              <span className={styles.hint}> (HTML supported)</span>
-            </label>
+            <label className={styles.label}>Content <span className={styles.req}>*</span></label>
+
+            {/* Formatting toolbar */}
+            <div className={styles.editorToolbar}>
+              <div className={styles.toolbarGroup}>
+                <button type="button" className={styles.fmtBtn} title="Bold"
+                  onMouseDown={e => { e.preventDefault(); execFormat('bold'); }}><b>B</b></button>
+                <button type="button" className={styles.fmtBtn} title="Italic"
+                  onMouseDown={e => { e.preventDefault(); execFormat('italic'); }}><i>I</i></button>
+                <button type="button" className={styles.fmtBtn} title="Underline"
+                  onMouseDown={e => { e.preventDefault(); execFormat('underline'); }}><u>U</u></button>
+                <button type="button" className={styles.fmtBtn} title="Strikethrough"
+                  onMouseDown={e => { e.preventDefault(); execFormat('strikeThrough'); }}><s>S</s></button>
+              </div>
+              <div className={styles.toolbarSep} />
+              <div className={styles.toolbarGroup}>
+                <button type="button" className={styles.fmtBtn} title="Normal paragraph"
+                  onMouseDown={e => { e.preventDefault(); execFormat('formatBlock', 'p'); }}>P</button>
+                <button type="button" className={styles.fmtBtn} title="Heading 2"
+                  onMouseDown={e => { e.preventDefault(); execFormat('formatBlock', 'h2'); }}>H2</button>
+                <button type="button" className={styles.fmtBtn} title="Heading 3"
+                  onMouseDown={e => { e.preventDefault(); execFormat('formatBlock', 'h3'); }}>H3</button>
+                <button type="button" className={styles.fmtBtn} title="Blockquote"
+                  onMouseDown={e => { e.preventDefault(); execFormat('formatBlock', 'blockquote'); }}>" Q</button>
+              </div>
+              <div className={styles.toolbarSep} />
+              <div className={styles.toolbarGroup}>
+                <button type="button" className={styles.fmtBtn} title="Align left"
+                  onMouseDown={e => { e.preventDefault(); execFormat('justifyLeft'); }}>⬱L</button>
+                <button type="button" className={styles.fmtBtn} title="Center"
+                  onMouseDown={e => { e.preventDefault(); execFormat('justifyCenter'); }}>≡C</button>
+                <button type="button" className={styles.fmtBtn} title="Align right"
+                  onMouseDown={e => { e.preventDefault(); execFormat('justifyRight'); }}>⬰R</button>
+              </div>
+              <div className={styles.toolbarSep} />
+              <div className={styles.toolbarGroup}>
+                <button type="button" className={styles.fmtBtn} title="Bullet list"
+                  onMouseDown={e => { e.preventDefault(); execFormat('insertUnorderedList'); }}>• List</button>
+                <button type="button" className={styles.fmtBtn} title="Numbered list"
+                  onMouseDown={e => { e.preventDefault(); execFormat('insertOrderedList'); }}>1. List</button>
+              </div>
+              <div className={styles.toolbarSep} />
+              <div className={styles.toolbarGroup}>
+                <button type="button" className={styles.fmtBtn} title="Clear formatting"
+                  onMouseDown={e => { e.preventDefault(); execFormat('removeFormat'); }}>✕ Clear</button>
+              </div>
+            </div>
 
             {/* Inline media toolbar */}
             <div className={styles.mediaToolbar}>
@@ -248,13 +310,12 @@ export default function PostEditorPage() {
               </div>
             )}
 
-            <textarea
+            <div
               ref={contentRef}
-              className={`${styles.textarea} ${styles.contentArea}`}
-              rows={18}
-              value={form.content}
-              onChange={e => set('content', e.target.value)}
-              placeholder="Full article content. You can use HTML tags like <b>, <p>, <a href='...'>, etc."
+              contentEditable
+              suppressContentEditableWarning
+              className={styles.contentEditable}
+              data-placeholder="Write your article here…"
             />
           </div>
         </div>
