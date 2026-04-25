@@ -152,10 +152,28 @@ export async function updateUserRole(uid, newRole, idToken) {
 // ─── Image upload ─────────────────────────────────────────────────────────────
 export async function uploadImage(file, idToken, folder = 'posts') {
   const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
-  const mime = ext === 'png' ? 'image/png' : 'image/jpeg';
+  const mimeMap = { png: 'image/png', gif: 'image/gif', webp: 'image/webp', jpg: 'image/jpeg', jpeg: 'image/jpeg' };
+  const mime = mimeMap[ext] ?? 'image/jpeg';
   const filename = `${folder}/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
   const encoded = encodeURIComponent(filename);
 
+  // On Netlify (production), proxy through a serverless function to avoid CORS restrictions.
+  // Firebase Storage blocks direct browser uploads from non-whitelisted origins.
+  if (!import.meta.env.DEV) {
+    const res = await fetch('/.netlify/functions/upload-image', {
+      method: 'POST',
+      headers: {
+        'Content-Type': mime,
+        'X-Upload-Meta': JSON.stringify({ filename, mimeType: mime, token: idToken }),
+      },
+      body: file,
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? 'Upload failed');
+    return data.url;
+  }
+
+  // Local dev: upload directly
   let lastError = 'Image upload failed.';
   for (const bucket of BUCKETS) {
     const base = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o`;

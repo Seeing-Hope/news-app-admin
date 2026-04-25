@@ -37,8 +37,13 @@ export default function PostEditorPage() {
   const [inlineUploading, setInlineUploading] = useState(false);
 
   const toEmbedUrl = (url) => {
-    const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/);
-    return m?.[1] ? `https://www.youtube-nocookie.com/embed/${m[1]}?rel=0&modestbranding=1&playsinline=1` : null;
+    const trimmed = url.trim();
+    // Accept raw <iframe> embed code — extract the src directly
+    const iframeSrc = trimmed.match(/<iframe[^>]+src=["']([^"']+)["']/i)?.[1];
+    if (iframeSrc) return iframeSrc;
+    // Standard watch URL, short URL, shorts URL, or existing embed URL
+    const m = trimmed.match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([^&?/\s]+)/);
+    return m?.[1] ? `https://www.youtube.com/embed/${m[1]}?rel=0&modestbranding=1&playsinline=1` : null;
   };
 
   const insertAtCursor = (html) => {
@@ -71,9 +76,12 @@ export default function PostEditorPage() {
   };
 
   const handleInsertYoutube = () => {
-    const embedUrl = toEmbedUrl(ytUrlValue.trim());
-    if (!embedUrl) { setError('Invalid YouTube URL.'); return; }
-    insertAtCursor(`<iframe src="${embedUrl}" height="315" allowfullscreen></iframe>`);
+    const embedSrc = toEmbedUrl(ytUrlValue.trim());
+    if (!embedSrc) { setError('Invalid YouTube URL or embed code.'); return; }
+    insertAtCursor(
+      `<iframe src="${embedSrc}" height="315" title="YouTube video" frameborder="0" ` +
+      `allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`
+    );
     setYtUrlValue('');
     setShowYtInput(false);
   };
@@ -230,7 +238,7 @@ export default function PostEditorPage() {
                   className={styles.input}
                   value={ytUrlValue}
                   onChange={e => setYtUrlValue(e.target.value)}
-                  placeholder="Paste YouTube URL (e.g. https://youtu.be/…)"
+                  placeholder="Paste YouTube URL or <iframe> embed code"
                   onKeyDown={e => e.key === 'Enter' && handleInsertYoutube()}
                   autoFocus
                 />
