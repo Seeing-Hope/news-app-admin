@@ -158,15 +158,18 @@ export async function uploadImage(file, idToken, folder = 'posts') {
   const encoded = encodeURIComponent(filename);
 
   // On Netlify (production), proxy through a serverless function to avoid CORS restrictions.
-  // Firebase Storage blocks direct browser uploads from non-whitelisted origins.
+  // File is sent as base64 JSON to avoid binary body encoding issues in Netlify Functions.
   if (!import.meta.env.DEV) {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
     const res = await fetch('/.netlify/functions/upload-image', {
       method: 'POST',
-      headers: {
-        'Content-Type': mime,
-        'X-Upload-Meta': JSON.stringify({ filename, mimeType: mime, token: idToken }),
-      },
-      body: file,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ base64, mimeType: mime, filename, token: idToken }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? 'Upload failed');
