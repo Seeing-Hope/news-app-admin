@@ -53,8 +53,11 @@ export default function PostEditorPage() {
   const getContent = () => {
     const el = contentRef.current;
     if (!el) return form.content;
-    const html = el.innerHTML;
-    return html === '<br>' || html === '' ? '' : html;
+    let html = el.innerHTML;
+    if (html === '<br>' || html === '') return '';
+    // Strip trailing empty block elements that contenteditable inserts
+    html = html.replace(/(\s*<(p|div|h[1-6]|blockquote|li)[^>]*>(\s|&nbsp;|<br\s*\/?>)*<\/\2>)+\s*$/gi, '').trim();
+    return html;
   };
 
   const saveSelection = () => {
