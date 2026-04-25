@@ -29,6 +29,54 @@ export default function PostEditorPage() {
   const [error, setError]           = useState('');
   const [loading, setLoading]       = useState(isEdit);
   const fileRef = useRef();
+  const contentRef = useRef();
+  const inlineFileRef = useRef();
+
+  const [showYtInput, setShowYtInput]     = useState(false);
+  const [ytUrlValue, setYtUrlValue]       = useState('');
+  const [inlineUploading, setInlineUploading] = useState(false);
+
+  const toEmbedUrl = (url) => {
+    const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?/]+)/);
+    return m?.[1] ? `https://www.youtube-nocookie.com/embed/${m[1]}?rel=0&modestbranding=1&playsinline=1` : null;
+  };
+
+  const insertAtCursor = (html) => {
+    const el = contentRef.current;
+    if (!el) return;
+    const start = el.selectionStart;
+    const end   = el.selectionEnd;
+    const newContent = form.content.slice(0, start) + '\n' + html + '\n' + form.content.slice(end);
+    set('content', newContent);
+    requestAnimationFrame(() => {
+      const pos = start + html.length + 2;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+  };
+
+  const handleInlineImage = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setInlineUploading(true);
+    try {
+      const url = await uploadImage(file, session.idToken, 'inline');
+      insertAtCursor(`<img src="${url}" alt="image">`);
+    } catch (err) {
+      setError('Image upload failed: ' + err.message);
+    } finally {
+      setInlineUploading(false);
+    }
+  };
+
+  const handleInsertYoutube = () => {
+    const embedUrl = toEmbedUrl(ytUrlValue.trim());
+    if (!embedUrl) { setError('Invalid YouTube URL.'); return; }
+    insertAtCursor(`<iframe src="${embedUrl}" height="315" allowfullscreen></iframe>`);
+    setYtUrlValue('');
+    setShowYtInput(false);
+  };
 
   useEffect(() => {
     if (!isEdit) return;
@@ -147,7 +195,53 @@ export default function PostEditorPage() {
             <label className={styles.label}>Content <span className={styles.req}>*</span>
               <span className={styles.hint}> (HTML supported)</span>
             </label>
+
+            {/* Inline media toolbar */}
+            <div className={styles.mediaToolbar}>
+              <button
+                type="button"
+                className={styles.mediaBtn}
+                disabled={inlineUploading}
+                onClick={() => inlineFileRef.current.click()}
+                title="Insert image at cursor position"
+              >
+                {inlineUploading ? 'Uploading…' : '📷 Insert Image'}
+              </button>
+              <button
+                type="button"
+                className={`${styles.mediaBtn} ${showYtInput ? styles.mediaBtnActive : ''}`}
+                onClick={() => { setShowYtInput(v => !v); setYtUrlValue(''); setError(''); }}
+                title="Insert YouTube video at cursor position"
+              >
+                ▶ Insert Video
+              </button>
+              <input
+                ref={inlineFileRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={handleInlineImage}
+              />
+            </div>
+
+            {showYtInput && (
+              <div className={styles.ytRow}>
+                <input
+                  className={styles.input}
+                  value={ytUrlValue}
+                  onChange={e => setYtUrlValue(e.target.value)}
+                  placeholder="Paste YouTube URL (e.g. https://youtu.be/…)"
+                  onKeyDown={e => e.key === 'Enter' && handleInsertYoutube()}
+                  autoFocus
+                />
+                <button type="button" className={styles.ytInsertBtn} onClick={handleInsertYoutube}>
+                  Insert
+                </button>
+              </div>
+            )}
+
             <textarea
+              ref={contentRef}
               className={`${styles.textarea} ${styles.contentArea}`}
               rows={18}
               value={form.content}
